@@ -1,8 +1,10 @@
 use crate::vmcmd::*;
 
 pub struct Assembler {
+    filename: String,
     cmd: Vec<VMCmd>,
     assembly: String,
+    label_counter: usize,
 }
 
 impl Assembler {
@@ -10,6 +12,8 @@ impl Assembler {
         Assembler {
             cmd: cmd_list,
             assembly: String::new(),
+            filename: String::new(),
+            label_counter: 0,
         }
     }
 
@@ -65,11 +69,29 @@ impl Assembler {
     }
 
     fn commit_comparison(&mut self, operation: &str, comment: &str) {
-        self.commit_comment(comment);
+        // first, do D == stack[n-1] - stack[n]
+        let true_label = format!(
+            "_TRUE_{}_{}_{}",
+            self.filename, operation, self.label_counter
+        );
+        let false_label = format!(
+            "_FALSE_{}_{}_{}",
+            self.filename, operation, self.label_counter
+        );
+
+        self.commit_binary_operation("M-D", comment);
+        self.commit(&format!("@{}", true_label));
+        self.commit(&format!("D;{}", operation));
         self.commit("@SP");
-        self.commit("AM=M-1");
-        self.commit("D=M");
-        self.commit("A=A-1");
-        self.commit(&format!("{}", operation));
+        self.commit("A=M-1");
+        self.commit("M=0");
+        self.commit(&format!("@{}", false_label));
+        self.commit("0;JMP");
+        self.commit(&format!("({})", true_label));
+        self.commit("@SP");
+        self.commit("A=M-1");
+        self.commit("M=-1");
+        self.commit(&format!("({})", false_label));
+        self.label_counter += 1;
     }
 }
