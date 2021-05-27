@@ -13,31 +13,17 @@ pub fn parse(vm_code: &str) -> Vec<VMCmd> {
     return output;
 }
 
-fn get_segment(s: &str) -> Segment {
-    return match s {
-        "constant" => Segment::Constant,
-        "argument" => Segment::Argument,
-        "local" => Segment::Local,
-        "static" => Segment::Static,
-        "this" => Segment::This,
-        "thas" => Segment::That,
-        "pointer" => Segment::Pointer,
-        "temp" => Segment::Temp,
-        _ => panic!("Segment {} not recognized!", s),
-    };
-}
-
 fn parse_instruction(instruction: &str) -> VMCmd {
     let tokens: Vec<&str> = instruction.split(' ').collect();
     let cmd = match tokens[0] {
         "push" => VMCmd::Push(PushCmd {
-            segment: get_segment(tokens[1]),
+            segment: String::from(tokens[1]),
             value: tokens[2]
                 .parse()
                 .expect("Expected a numeric value with push command"),
         }),
         "pop" => VMCmd::Pop(PopCmd {
-            segment: get_segment(tokens[1]),
+            segment: String::from(tokens[1]),
             value: tokens[2]
                 .parse()
                 .expect("Expected a numeric value with pop command"),

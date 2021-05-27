@@ -14,22 +14,11 @@ pub enum VMCmd {
 }
 
 pub struct PushCmd {
-    pub segment: Segment,
+    pub segment: String,
     pub value: i16,
 }
 
 pub struct PopCmd {
-    pub segment: Segment,
+    pub segment: String,
     pub value: i16,
-}
-
-pub enum Segment {
-    Argument,
-    Local,
-    Static,
-    Constant,
-    This,
-    That,
-    Pointer,
-    Temp,
 }

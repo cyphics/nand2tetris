@@ -2,7 +2,7 @@ use crate::vmcmd::*;
 
 pub struct Assembler {
     filename: String,
-    cmd: Vec<VMCmd>,
+    _cmd: Vec<VMCmd>,
     assembly: String,
     label_counter: usize,
 }
@@ -10,7 +10,7 @@ pub struct Assembler {
 impl Assembler {
     pub fn new(cmd_list: Vec<VMCmd>) -> Assembler {
         Assembler {
-            cmd: cmd_list,
+            _cmd: cmd_list,
             assembly: String::new(),
             filename: String::new(),
             label_counter: 0,
@@ -36,8 +36,8 @@ impl Assembler {
             VMCmd::Gt => self.commit_comparison("JGT", "gt"),
             VMCmd::Lt => self.commit_comparison("JLT", "lt"),
             VMCmd::Return => {}
-            VMCmd::Push(push) => {}
-            VMCmd::Pop(pop) => {}
+            VMCmd::Push(push) => self.commit_push(push),
+            VMCmd::Pop(pop) => self.commit_pop(pop),
         }
 
         String::new()
@@ -93,5 +93,37 @@ impl Assembler {
         self.commit("M=-1");
         self.commit(&format!("({})", false_label));
         self.label_counter += 1;
+    }
+
+    fn commit_push(&mut self, cmd: &PushCmd) {
+        self.commit_comment(&format!("push {} {}", cmd.segment, cmd.value));
+        match cmd.segment.as_ref() {
+            "constant" => {
+                self.commit_const_to_d(cmd.value);
+                self.commit_d_to_stack();
+                self.commit_increment_stack();
+            }
+            _ => panic!("Unknown segment : {}", cmd.segment),
+        }
+    }
+
+    fn commit_pop(&mut self, cmd: &PopCmd) {
+        self.commit_comment(&format!("pop {} {}", cmd.segment, cmd.value));
+    }
+
+    fn commit_const_to_d(&mut self, value: i16) {
+        self.commit(&format!("@{}", value));
+        self.commit("D=A");
+    }
+
+    fn commit_d_to_stack(&mut self) {
+        self.commit("@SP");
+        self.commit("A=M");
+        self.commit("M=D");
+    }
+
+    fn commit_increment_stack(&mut self) {
+        self.commit("@SP");
+        self.commit("M=M+1");
     }
 }

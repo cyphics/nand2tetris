@@ -13,5 +13,5 @@ impl Setup {
 
 pub fn run(_setup: Setup) {
     let codes = parser::parse("push constant 8");
-    let assembler = converter::Assembler::new(codes);
+    let _assembler = converter::Assembler::new(codes);
 }
