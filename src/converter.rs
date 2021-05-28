@@ -35,7 +35,7 @@ impl Assembler {
             VMCmd::Lt(_) => self.commit_comparison("JLT", "lt"),
             VMCmd::Return(_) => {}
             VMCmd::Push(push, line) => self.commit_push(push, *line),
-            VMCmd::Pop(pop, _) => self.commit_pop(pop),
+            VMCmd::Pop(pop, line) => self.commit_pop(pop, *line),
         }
     }
 
@@ -76,6 +76,7 @@ impl Assembler {
         );
 
         self.commit_binary_operation("M-D", comment);
+        self.commit("D=M");
         self.commit(&format!("@{}", true_label));
         self.commit(&format!("D;{}", operation));
         self.commit("@SP");
@@ -155,8 +156,83 @@ impl Assembler {
         }
     }
 
-    fn commit_pop(&mut self, cmd: &PopCmd) {
+    fn commit_pop(&mut self, cmd: &PopCmd, line_number: u32) {
         self.commit_comment(&format!("pop {} {}", cmd.segment, cmd.value));
+        match cmd.segment.as_ref() {
+            "temp" => {
+                self.commit_const_to_d(5);
+                self.commit(&format!("@{}", cmd.value));
+                self.commit("D=D+A");
+                self.commit_d_to_register("R13");
+                self.commit_decrement_stack();
+                self.commit_stack_to_d();
+                self.commit("@R13");
+                self.commit("A=M");
+                self.commit("M=D");
+            }
+            "static" => {
+                self.commit_decrement_stack();
+                self.commit_stack_to_d();
+                self.commit(&format!("@_static_{}_{}", self.filename, cmd.value));
+                self.commit("M=D");
+            }
+            "local" | "argument" | "this" | "that" => {
+                let register = match cmd.segment.as_ref() {
+                    "local" => "LCL",
+                    "argument" => "ARG",
+                    "this" => "THIS",
+                    "that" => "THAT",
+                    _ => panic!(
+                        "Error at line {} : \"push {} {}\" -- Unknown segment {}",
+                        line_number, cmd.segment, cmd.value, cmd.value
+                    ),
+                };
+                self.commit_register_to_d(register);
+                self.commit(&format!("@{}", cmd.value));
+                self.commit("D=D+A");
+                self.commit_d_to_register("R13");
+                self.commit_decrement_stack();
+                self.commit_stack_to_d();
+                self.commit("@R13");
+                self.commit("A=M");
+                self.commit("M=D");
+            }
+            "pointer" => {
+                let register = match cmd.value {
+                    0 => "THIS",
+                    1 => "THAT",
+                    _ => panic!("Wrong pointer value {}, line {}", cmd.value, line_number),
+                };
+                self.commit_decrement_stack();
+                self.commit_stack_to_d();
+                self.commit(&format!("@{}", register));
+                self.commit("M=D");
+            }
+
+            "constant" => {
+                panic!(
+                    "Error at line {} : \"pop constant {}\" -- pop constant not authorized.",
+                    line_number, cmd.value
+                )
+            }
+
+            _ => {
+                panic!(
+                    "Error at line {} : \"pop {} {}\" -- Segment {} not recognized.",
+                    line_number, cmd.segment, cmd.value, cmd.segment
+                )
+            }
+        }
+    }
+
+    fn commit_d_to_register(&mut self, reg: &str) {
+        self.commit(&format!("@{}", reg));
+        self.commit("M=D");
+    }
+
+    fn commit_register_to_d(&mut self, reg: &str) {
+        self.commit(&format!("@{}", reg));
+        self.commit("D=M");
     }
 
     fn commit_const_to_d(&mut self, value: i16) {
@@ -164,10 +240,21 @@ impl Assembler {
         self.commit("D=A");
     }
 
+    fn commit_stack_to_d(&mut self) {
+        self.commit("@SP");
+        self.commit("A=M");
+        self.commit("D=M");
+    }
+
     fn commit_d_to_stack(&mut self) {
         self.commit("@SP");
         self.commit("A=M");
         self.commit("M=D");
+    }
+
+    fn commit_decrement_stack(&mut self) {
+        self.commit("@SP");
+        self.commit("M=M-1");
     }
 
     fn commit_increment_stack(&mut self) {
