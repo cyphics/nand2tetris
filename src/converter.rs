@@ -22,23 +22,21 @@ impl Assembler {
         return String::from(&self.assembly);
     }
 
-    fn translate_cmd(&mut self, cmd: &VMCmd) -> String {
+    fn translate_cmd(&mut self, cmd: &VMCmd) {
         match cmd {
-            VMCmd::Add => self.commit_binary_operation("D+M", "add"),
-            VMCmd::Sub => self.commit_binary_operation("M-D", "sub"),
-            VMCmd::Or => self.commit_binary_operation("M|D", "or"),
-            VMCmd::And => self.commit_binary_operation("M&D", "and"),
-            VMCmd::Neg => self.commit_unary_operation("-M", "neg"),
-            VMCmd::Not => self.commit_unary_operation("!M", "not"),
-            VMCmd::Eq => self.commit_comparison("JEQ", "eq"),
-            VMCmd::Gt => self.commit_comparison("JGT", "gt"),
-            VMCmd::Lt => self.commit_comparison("JLT", "lt"),
-            VMCmd::Return => {}
-            VMCmd::Push(push) => self.commit_push(push),
-            VMCmd::Pop(pop) => self.commit_pop(pop),
+            VMCmd::Add(_) => self.commit_binary_operation("D+M", "add"),
+            VMCmd::Sub(_) => self.commit_binary_operation("M-D", "sub"),
+            VMCmd::Or(_) => self.commit_binary_operation("M|D", "or"),
+            VMCmd::And(_) => self.commit_binary_operation("M&D", "and"),
+            VMCmd::Neg(_) => self.commit_unary_operation("-M", "neg"),
+            VMCmd::Not(_) => self.commit_unary_operation("!M", "not"),
+            VMCmd::Eq(_) => self.commit_comparison("JEQ", "eq"),
+            VMCmd::Gt(_) => self.commit_comparison("JGT", "gt"),
+            VMCmd::Lt(_) => self.commit_comparison("JLT", "lt"),
+            VMCmd::Return(_) => {}
+            VMCmd::Push(push, line) => self.commit_push(push, *line),
+            VMCmd::Pop(pop, _) => self.commit_pop(pop),
         }
-
-        String::new()
     }
 
     fn commit(&mut self, s: &str) {
@@ -93,7 +91,7 @@ impl Assembler {
         self.label_counter += 1;
     }
 
-    fn commit_push(&mut self, cmd: &PushCmd) {
+    fn commit_push(&mut self, cmd: &PushCmd, line_number: u32) {
         self.commit_comment(&format!("push {} {}", cmd.segment, cmd.value));
         match cmd.segment.as_ref() {
             "local" | "argument" | "this" | "that" => {
@@ -102,7 +100,10 @@ impl Assembler {
                     "argument" => "ARG",
                     "this" => "THIS",
                     "that" => "THAT",
-                    _ => panic!("Unknown segment {}", cmd.segment),
+                    _ => panic!(
+                        "Error at line {} : \"push {} {}\" -- Unknown segment {}",
+                        line_number, cmd.segment, cmd.value, cmd.value
+                    ),
                 };
                 self.commit(&format!("@{}", register));
                 self.commit("D=M");
@@ -127,7 +128,7 @@ impl Assembler {
                 let register = match cmd.value {
                     0 => "THIS",
                     1 => "THAT",
-                    _ => panic!("Wrong pointer value {}", cmd.value),
+                    _ => panic!("Wrong pointer value {}, line {}", cmd.value, line_number),
                 };
                 self.commit(&format!("@{}", register));
                 self.commit("D=M");
@@ -138,8 +139,10 @@ impl Assembler {
             "temp" => {
                 // RAM[5-12]
                 assert!(
-                    0 < cmd.value && cmd.value < 6,
-                    "Temp value {} overflow",
+                    0 < cmd.value && cmd.value < 9,
+                    "Error at line {} : \"push temp {}\" -- Temp value {} overflow",
+                    line_number,
+                    cmd.value,
                     cmd.value
                 );
                 self.commit(&format!("@{}", cmd.value + 5));
@@ -148,7 +151,7 @@ impl Assembler {
                 self.commit_increment_stack();
             }
 
-            _ => panic!("Unknown segment : {}", cmd.segment),
+            _ => panic!("Unknown segment : {}, line {}", cmd.segment, line_number),
         }
     }
 

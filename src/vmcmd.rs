@@ -1,16 +1,16 @@
 pub enum VMCmd {
-    Add,
-    Sub,
-    Neg,
-    Eq,
-    Gt,
-    Lt,
-    And,
-    Or,
-    Not,
-    Pop(PopCmd),
-    Push(PushCmd),
-    Return,
+    Add(u32),
+    Sub(u32),
+    Neg(u32),
+    Eq(u32),
+    Gt(u32),
+    Lt(u32),
+    And(u32),
+    Or(u32),
+    Not(u32),
+    Pop(PopCmd, u32),
+    Push(PushCmd, u32),
+    Return(u32),
 }
 
 pub struct PushCmd {
