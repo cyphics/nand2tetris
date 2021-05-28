@@ -2,17 +2,15 @@ use crate::vmcmd::*;
 
 pub struct Assembler {
     filename: String,
-    _cmd: Vec<VMCmd>,
     assembly: String,
     label_counter: usize,
 }
 
 impl Assembler {
-    pub fn new(cmd_list: Vec<VMCmd>) -> Assembler {
+    pub fn new(filename: String) -> Assembler {
         Assembler {
-            _cmd: cmd_list,
             assembly: String::new(),
-            filename: String::new(),
+            filename,
             label_counter: 0,
         }
     }
@@ -21,7 +19,7 @@ impl Assembler {
         for cmd in cmd_list.iter() {
             self.translate_cmd(cmd);
         }
-        return String::new();
+        return String::from(&self.assembly);
     }
 
     fn translate_cmd(&mut self, cmd: &VMCmd) -> String {
@@ -98,11 +96,58 @@ impl Assembler {
     fn commit_push(&mut self, cmd: &PushCmd) {
         self.commit_comment(&format!("push {} {}", cmd.segment, cmd.value));
         match cmd.segment.as_ref() {
+            "local" | "argument" | "this" | "that" => {
+                let register = match cmd.segment.as_ref() {
+                    "local" => "LCL",
+                    "argument" => "ARG",
+                    "this" => "THIS",
+                    "that" => "THAT",
+                    _ => panic!("Unknown segment {}", cmd.segment),
+                };
+                self.commit(&format!("@{}", register));
+                self.commit("D=M");
+                self.commit(&format!("@{}", cmd.value));
+                self.commit("A=D+A");
+                self.commit("D=M");
+                self.commit_d_to_stack();
+                self.commit_increment_stack();
+            }
             "constant" => {
                 self.commit_const_to_d(cmd.value);
                 self.commit_d_to_stack();
                 self.commit_increment_stack();
             }
+            "static" => {
+                self.commit(&format!("@_static_{}_{}", self.filename, cmd.value));
+                self.commit("D=M");
+                self.commit_d_to_stack();
+                self.commit_increment_stack();
+            }
+            "pointer" => {
+                let register = match cmd.value {
+                    0 => "THIS",
+                    1 => "THAT",
+                    _ => panic!("Wrong pointer value {}", cmd.value),
+                };
+                self.commit(&format!("@{}", register));
+                self.commit("D=M");
+                self.commit_d_to_stack();
+                self.commit_increment_stack();
+            }
+
+            "temp" => {
+                // RAM[5-12]
+                assert!(
+                    0 < cmd.value && cmd.value < 6,
+                    "Temp value {} overflow",
+                    cmd.value
+                );
+                self.commit(&format!("@{}", cmd.value + 5));
+                self.commit("D=M");
+                self.commit_d_to_stack();
+                self.commit_increment_stack();
+            }
+
             _ => panic!("Unknown segment : {}", cmd.segment),
         }
     }
