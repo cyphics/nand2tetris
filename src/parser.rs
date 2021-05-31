@@ -31,8 +31,9 @@ fn parse_instruction(instruction: &str, line_counter: u32) -> VMCmd {
                              PopCmd {
                                 segment: String::from(tokens[1]),
                                 value: tokens[2]
+                                 .trim()
                                  .parse()
-                                 .expect("Expected a numeric value with pop command"),
+                                 .unwrap_or_else(|_|panic!("Error at line {}, Expected a numeric value with pop command, got {} instead", line_counter, tokens[2])),
                              },
                              line_counter,),
         "add"      => VMCmd::Add(line_counter),
