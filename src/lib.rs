@@ -1,4 +1,4 @@
-pub mod converter;
+pub mod code_writer;
 pub mod parser;
 pub mod vmcmd;
 
@@ -73,7 +73,7 @@ pub fn run(setup: Setup) {
     for file in setup.input {
         let vm_code = fs::read_to_string(&file).expect("Could not read from file");
         let vm_cmds = parser::parse(&vm_code);
-        let mut assembler = converter::Assembler::new(file);
+        let mut assembler = code_writer::Assembler::new(file);
         let assembly = assembler.convert(vm_cmds);
         output_file
             .write_all(assembly.as_bytes())
