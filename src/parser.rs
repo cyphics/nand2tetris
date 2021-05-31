@@ -33,7 +33,9 @@ fn parse_instruction(instruction: &str, line_counter: u32) -> VMCmd {
                                 value: tokens[2]
                                  .trim()
                                  .parse()
-                                 .unwrap_or_else(|_|panic!("Error at line {}, Expected a numeric value with pop command, got {} instead", line_counter, tokens[2])),
+                                 .unwrap_or_else(|_|panic!(
+                                         "Error at line {}, Expected a numeric value with pop command, got {} instead"
+                                         , line_counter, tokens[2])),
                              },
                              line_counter,),
         "add"      => VMCmd::Add(line_counter),
@@ -53,7 +55,9 @@ fn parse_instruction(instruction: &str, line_counter: u32) -> VMCmd {
                                  function_name: String::from(tokens[1]),
                                  local_args: tokens[2]
                                      .parse()
-                                     .unwrap_or_else(|x|panic!("Error at line {} : Expected numeric value for local argument number of function {}, got {} instead", line_counter, tokens[1], x)),
+                                     .unwrap_or_else(|x|panic!(
+                                             "Error at line {} : Expected numeric value for local argument number of function {}, got {} instead", 
+                                             line_counter, tokens[1], x)),
                              },
                              line_counter),
         "call"     => VMCmd::Call(
@@ -61,7 +65,9 @@ fn parse_instruction(instruction: &str, line_counter: u32) -> VMCmd {
                                  function_name: String::from(tokens[1]),
                                  args: tokens[2]
                                      .parse()
-                                     .unwrap_or_else(|x|panic!("Error at line {} : Expected numeric value for argument number of function {}, got {} instead", line_counter, tokens[1], x)),
+                                     .unwrap_or_else(|x|panic!(
+                                             "Error at line {} : Expected numeric value for argument number of function {}, got {} instead"
+                                             , line_counter, tokens[1], x)),
                              },
                              line_counter),
         "return"   => VMCmd::Return(line_counter),

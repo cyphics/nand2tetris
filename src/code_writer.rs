@@ -5,15 +5,17 @@ pub struct Assembler {
     label_index: u32,
     assembly: String,
     label_counter: usize,
+    no_comment: bool
 }
 
 impl Assembler {
-    pub fn new(filename: String) -> Assembler {
+    pub fn new(filename: String, no_comment: bool) -> Assembler {
         Assembler {
             assembly: String::new(),
             filename,
             label_counter: 0,
-            label_index: 0
+            label_index: 0,
+            no_comment
         }
     }
 
@@ -41,7 +43,7 @@ impl Assembler {
             VMCmd::Goto(label, _)          => self.commit_goto(label),
             VMCmd::IfGoto(label, _)        => self.commit_if_goto(label),
             VMCmd::Function(fct_cmd, line) => self.commit_function_declaration(fct_cmd, *line),
-            VMCmd::Call(call_cmd, line)    => self.commit_function_call(call_cmd, *line),
+            VMCmd::Call(call_cmd, _)       => self.commit_function_call(call_cmd),
             VMCmd::Return(_)               => self.commit_return(),
         }
     }
@@ -52,7 +54,9 @@ impl Assembler {
     }
 
     fn commit_comment(&mut self, comment: &str) {
-        self.commit(&format!("\n// {}", comment));
+        if !self.no_comment {
+            self.commit(&format!("\n// {}", comment));
+        }
     }
 
     fn commit_d_to_register(&mut self, reg: &str) {
@@ -309,7 +313,7 @@ impl Assembler {
         }
     }
 
-    fn commit_function_call(&mut self, call_cmd: &CallCmd, line_number: u32){
+    fn commit_function_call(&mut self, call_cmd: &CallCmd){
         self.commit_comment(&format!("call of fn {}.{} {}", self.filename, call_cmd.function_name, call_cmd.args));
         let func_label = get_function_label(&call_cmd.function_name, &self.filename);
         let return_address = format!("__{}$return.{}__", call_cmd.function_name, self.label_index);
@@ -348,7 +352,56 @@ impl Assembler {
         self.label_index += 1;
     }
 
-    fn commit_return(&mut self){}
+    fn commit_return(&mut self){
+        self.commit_comment("Return");
+        // FRAME (R13) = LCL
+        self.commit_register_to_d("LCL");
+        self.commit_d_to_register("R13");
+
+        // Return address (R14) = *(FRAME-5)
+        self.commit_restore_frame_to_register(5, "R14");
+        
+        // Pop the top-most value of the stack to *ARG, to set the return value of the function
+        self.commit_comment("Pop return value to *ARG");
+        self.commit_decrement_stack();
+        self.commit("@SP");
+        self.commit("A=M");
+        self.commit("D=M");
+        self.commit("@ARG");
+        self.commit("A=M");
+        self.commit("M=D");
+
+        // SP = ARG+1
+        self.commit_comment("Restore stack");
+        self.commit("@ARG");
+        self.commit("D=M");
+        self.commit("D=D+1");
+        self.commit_d_to_register("SP");
+
+        // Restore caller's frame
+        self.commit_comment("Restore frame");
+        self.commit_restore_frame_to_register(1, "THAT");
+        self.commit_restore_frame_to_register(2, "THIS");
+        self.commit_restore_frame_to_register(3, "ARG");
+        self.commit_restore_frame_to_register(4, "LCL");
+
+        // GOTO stored return address
+        self.commit_comment("Goto stored return address");
+        self.commit_register_to_d("R14");
+        self.commit("A=D");
+        self.commit("0;JMP");
+    }
+
+    fn commit_restore_frame_to_register(&mut self, frame_idx: usize, register: &str) {
+        // register = *(FRAME - frame_idx)
+        self.commit(&format!("@R13"));
+        self.commit("D=M"); // D=FRAME
+        self.commit(&format!("@{}", frame_idx));
+        self.commit("D=D-A"); // D=FRAME-idx
+        self.commit("A=D");
+        self.commit("D=M"); // D = *(FRAME-idx)
+        self.commit_d_to_register(register);
+    } 
 }
 
 fn get_function_label(fct_name: &str, filename: &str) -> String{

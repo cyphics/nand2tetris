@@ -14,9 +14,10 @@ use std::process;
 pub struct Setup {
     pub input: Vec<String>,
     pub output: String,
+    pub nocomment: bool,
 }
 impl Setup {
-    pub fn new(_args: env::Args) -> Setup {
+    pub fn new() -> Setup {
         let args: Vec<String> = env::args().collect();
         let input_files;
         let mut output_file;
@@ -40,9 +41,17 @@ impl Setup {
             output_file = String::from(input_file.to_str().unwrap());
         };
 
+        let mut nocomment = false;
+        if args.len() >= 3 {
+            if args[2] == "--nocomment" {
+                nocomment = true;
+            }
+        }
+
         Setup {
             input: input_files,
             output: output_file,
+            nocomment
         }
     }
 }
@@ -73,7 +82,7 @@ pub fn run(setup: Setup) {
     for file in setup.input {
         let vm_code = fs::read_to_string(&file).expect("Could not read from file");
         let vm_cmds = parser::parse(&vm_code);
-        let mut assembler = code_writer::Assembler::new(file);
+        let mut assembler = code_writer::Assembler::new(file, setup.nocomment);
         let assembly = assembler.convert(vm_cmds);
         output_file
             .write_all(assembly.as_bytes())

@@ -1,8 +1,6 @@
-use std::env;
 use vmtranslator::Setup;
 
 fn main() {
-    let args = env::args();
-    let setup = Setup::new(args);
+    let setup = Setup::new();
     vmtranslator::run(setup);
 }
