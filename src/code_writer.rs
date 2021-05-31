@@ -33,9 +33,14 @@ impl Assembler {
             VMCmd::Eq(_) => self.commit_comparison("JEQ", "eq"),
             VMCmd::Gt(_) => self.commit_comparison("JGT", "gt"),
             VMCmd::Lt(_) => self.commit_comparison("JLT", "lt"),
-            VMCmd::Return(_) => {}
             VMCmd::Push(push, line) => self.commit_push(push, *line),
             VMCmd::Pop(pop, line) => self.commit_pop(pop, *line),
+            VMCmd::Label(_, _) => {}
+            VMCmd::Goto(_, _) => {}
+            VMCmd::IfGoto(_, _) => {}
+            VMCmd::Function(_, _) => {}
+            VMCmd::Call(_, _) => {}
+            VMCmd::Return(_) => {}
         }
     }
 

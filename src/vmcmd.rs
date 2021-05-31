@@ -10,7 +10,22 @@ pub enum VMCmd {
     Not(u32),
     Pop(PopCmd, u32),
     Push(PushCmd, u32),
+    Label(String, u32),
+    Goto(String, u32),
+    IfGoto(String, u32),
+    Function(FunctionCmd, u32),
+    Call(CallCmd, u32),
     Return(u32),
+}
+
+pub struct FunctionCmd {
+    pub function_name: String,
+    pub local_args: usize,
+}
+
+pub struct CallCmd {
+    pub function_name: String,
+    pub args: usize,
 }
 
 pub struct PushCmd {
