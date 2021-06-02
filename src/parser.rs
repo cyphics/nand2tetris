@@ -5,7 +5,11 @@ pub fn parse(vm_code: &str) -> Vec<VMCmd> {
     let mut line_counter = 1;
 
     for line in vm_code.lines() {
-        let instruction = line.trim();
+        let instruction = line.trim()
+                              .split("//")
+                              .next()
+                              .unwrap()
+                              .trim();
         if instruction.is_empty() || instruction.starts_with("//") {
             line_counter += 1;
             continue;
@@ -23,8 +27,11 @@ fn parse_instruction(instruction: &str, line_counter: u32) -> VMCmd {
                              PushCmd {
                                 segment: String::from(tokens[1]),
                                 value:   tokens[2]
+                                          .trim()
                                           .parse()
-                                          .expect("Expected a numeric value with push command"),
+                                          .unwrap_or_else(|_|panic!(
+                                            "Error at line {}, Expected a numeric value with push command, got '{}' instead"
+                                         , line_counter, tokens[2])),
                              },
                              line_counter,),
         "pop"      => VMCmd::Pop(

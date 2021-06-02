@@ -1,20 +1,24 @@
 use crate::vmcmd::*;
+use std::io::Write;
+use std::fs::File;
 
 pub struct Assembler {
-    filename: String,
-    label_index: u32,
-    assembly: String,
+    filename     : String,
+    label_index  : u32,
+    assembly     : String,
     label_counter: usize,
-    no_comment: bool
+    no_comment   : bool,
+    current_fnc  : String,
 }
 
 impl Assembler {
     pub fn new(filename: String, no_comment: bool) -> Assembler {
         Assembler {
-            assembly: String::new(),
-            filename,
+            assembly     : String::from(format!("\n//\n// Translation unit: {}\n//\n", filename)),
             label_counter: 0,
-            label_index: 0,
+            label_index  : 0,
+            current_fnc  : String::new(),
+            filename,
             no_comment
         }
     }
@@ -124,12 +128,12 @@ impl Assembler {
     fn commit_comparison(&mut self, operation: &str, comment: &str) {
         // first, do D == stack[n-1] - stack[n]
         let true_label = format!(
-            "_TRUE_{}_{}_{}",
-            self.filename, operation, self.label_counter
+            "__{}_TRUE_{}_{}__",
+            operation, self.filename, self.label_counter
         );
         let false_label = format!(
-            "_FALSE_{}_{}_{}",
-            self.filename, operation, self.label_counter
+            "__{}_FALSE_{}_{}__",
+            operation, self.filename, self.label_counter
         );
 
         self.commit_binary_operation("M-D", comment);
@@ -283,7 +287,6 @@ impl Assembler {
     }
 
     fn commit_label(&mut self, label: &str){
-        self.commit_comment(&format!("label {}", label));
         self.commit(&format!("({})", label));
     }
 
@@ -301,11 +304,12 @@ impl Assembler {
         self.commit("D; JNE");
     }
 
-    fn commit_function_declaration(&mut self, fct_cmd: &FunctionCmd, line_number: u32){
-        self.commit_comment(&format!("declaration of fn {}.{} {}", self.filename, fct_cmd.function_name, fct_cmd.local_args));
-        let fct_label = get_function_label(&fct_cmd.function_name, &self.filename);
-        self.commit(&format!("({})", fct_label));
-        for _ in 0..fct_cmd.local_args{
+    fn commit_function_declaration(&mut self, fnc_cmd: &FunctionCmd, line_number: u32){
+        self.current_fnc = String::from(&fnc_cmd.function_name);
+        self.commit_comment(&format!("declaration of fn {}_{}",fnc_cmd.function_name, fnc_cmd.local_args));
+        let fnc_label = get_function_label(&fnc_cmd.function_name);
+        self.commit(&format!("({})", fnc_label));
+        for _ in 0..fnc_cmd.local_args{
             self.commit_push(&PushCmd{
                                 segment: String::from("constant"),
                                 value: 0
@@ -315,8 +319,8 @@ impl Assembler {
 
     fn commit_function_call(&mut self, call_cmd: &CallCmd){
         self.commit_comment(&format!("call of fn {}.{} {}", self.filename, call_cmd.function_name, call_cmd.args));
-        let func_label = get_function_label(&call_cmd.function_name, &self.filename);
-        let return_address = format!("__{}$return.{}__", call_cmd.function_name, self.label_index);
+        let func_label = get_function_label(&call_cmd.function_name);
+        let return_address = format!("__{}_{}$return.{}__", self.filename, call_cmd.function_name, self.label_index);
 
         // Push return-address
         self.commit(&format!("@{}", return_address));
@@ -353,7 +357,7 @@ impl Assembler {
     }
 
     fn commit_return(&mut self){
-        self.commit_comment("Return");
+        self.commit_comment(&format!("Return from {}", self.current_fnc));
         // FRAME (R13) = LCL
         self.commit_register_to_d("LCL");
         self.commit_d_to_register("R13");
@@ -364,9 +368,7 @@ impl Assembler {
         // Pop the top-most value of the stack to *ARG, to set the return value of the function
         self.commit_comment("Pop return value to *ARG");
         self.commit_decrement_stack();
-        self.commit("@SP");
-        self.commit("A=M");
-        self.commit("D=M");
+        self.commit_stack_to_d();
         self.commit("@ARG");
         self.commit("A=M");
         self.commit("M=D");
@@ -374,8 +376,7 @@ impl Assembler {
         // SP = ARG+1
         self.commit_comment("Restore stack");
         self.commit("@ARG");
-        self.commit("D=M");
-        self.commit("D=D+1");
+        self.commit("D=M+1");
         self.commit_d_to_register("SP");
 
         // Restore caller's frame
@@ -394,16 +395,26 @@ impl Assembler {
 
     fn commit_restore_frame_to_register(&mut self, frame_idx: usize, register: &str) {
         // register = *(FRAME - frame_idx)
-        self.commit(&format!("@R13"));
-        self.commit("D=M"); // D=FRAME
+        self.commit_register_to_d("R13");
         self.commit(&format!("@{}", frame_idx));
         self.commit("D=D-A"); // D=FRAME-idx
         self.commit("A=D");
         self.commit("D=M"); // D = *(FRAME-idx)
         self.commit_d_to_register(register);
     } 
+
+    pub fn commit_bootstrap(&mut self, output_file: &mut File){
+        self.commit_const_to_d(256);
+        self.commit_d_to_register("SP");
+        self.commit_function_call(&CallCmd{
+                                    function_name: String::from("Sys.init"), 
+                                    args: 0
+                                  });
+        output_file.write_all(self.assembly.as_bytes())
+                    .expect("Unable to write bootstrap code to file");
+    }
 }
 
-fn get_function_label(fct_name: &str, filename: &str) -> String{
-    return format!("__fn_{}_{}__", fct_name, filename);
+fn get_function_label(fct_name: &str) -> String{
+    return format!("__{}__", fct_name);
 }
