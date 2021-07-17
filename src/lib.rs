@@ -100,6 +100,8 @@ pub fn run(setup: Setup) {
         let vm_cmds = parser::parse(&vm_code);
         let mut assembler = code_writer::Assembler::new(file, setup.nocomment);
         let assembly = assembler.convert(vm_cmds);
+        println!("Assembly code: \n{}", assembly);
+        //println!("Saving ASM code to file %s", output_path);
         output_file
             .write_all(assembly.as_bytes())
             .expect("Unable to write assembly code to file");
