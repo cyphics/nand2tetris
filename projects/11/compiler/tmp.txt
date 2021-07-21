@@ -1,0 +1,23 @@
+
+void CompileTerm(){
+	OpenTag("term");
+	Emit("\n");
+	if(CurrentTokenValue("(")){
+		PopToken(); // (
+		CompileExpression();
+		PopToken(); // )
+	} else if(CurrentTokenValue("-") || CurrentTokenValue("~")){
+		PopToken(); // Unary operator
+		CompileTerm(); 
+	} else if (NextTokenValue("[")){
+			PopToken(); // array name
+			PopToken(); // [
+			CompileExpression();
+			PopToken(); // ]
+	}
+	else if(NextTokenValue("(") || NextTokenValue("."))
+		CompileSubroutineCall();
+	else PopToken();
+	CloseTag("term");
+
+}
