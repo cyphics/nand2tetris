@@ -30,6 +30,8 @@ char *compile_vm_ptr;
 char current_class_name[100];
 char current_routine_name[100];
 
+int while_counter = 0;
+int if_counter    = 0;
 
 /*************************************************
  * HELPER FUNCTIONS                              *
@@ -208,19 +210,40 @@ void WritePop(char *segment, int index){
 	compile_vm_ptr += sprintf(compile_vm_ptr, "pop %s %i\n", segment, index);
 }
 
-void WriteArithmetic(char *cmd){
-	if(cmd[0] == '+'){
+void WriteArithmetic(char c){
+	if(c == '+')
 		Write("add");
-	} else if(cmd[0] == '*'){
+	else if(c == '-')
+		Write("sub");
+	else if(c == '*')
 		Write("call Math.multiply 2");
-		}
+	else if(c == '/')
+		Write("call Math.divide 2");
+	else if(c == '<')
+		Write("lt");
+	else if(c == '>')
+		Write("gt");
+	else if(c == '&')
+		Write("and");
+	else if(c == '=')
+		Write("eq");
+	else if(c == '|')
+		Write("or");
+	
 }
 
-void WriteLabel(char *label){}
+void WriteLabel(char *label){
+	compile_vm_ptr += sprintf(compile_vm_ptr, "label %s\n", label);
+}
 
-void WriteGoto(char *label){}
+void WriteGoto(char *label){
+	compile_vm_ptr += sprintf(compile_vm_ptr, "goto %s\n", label);
+}
 
-void WriteIf(char *label){}
+void WriteIf(char *label){
+	compile_vm_ptr += sprintf(compile_vm_ptr, "if-goto %s\n", label);
+}
+
 
 void WriteCall(char *name, int nArgs){
 	compile_vm_ptr += sprintf(compile_vm_ptr, "call %s %i\n", name, nArgs);
@@ -259,21 +282,24 @@ int GetVarCount(Kind kind){
 			return 0;
 			break;
 	}
+	dprintf("unknown kind.\n");
 	exit(1);
 }
 
 char *GetKindOf(char *name){
+	size_t size = StringSize(name);
 	for(int i = 0; i < var_counter + argument_counter; i++){
-		if (strcmp(name, routine_table[i].name)) {
+		if (CompareStr(name, routine_table[i].name, size)) {
 			return KindToStr(routine_table[i].kind);
 		}
 	}
 
 	for(int i = 0; i < static_counter + field_counter; i++){
-		if (strcmp(name, class_table[i].name)) {
+		if (CompareStr(name, class_table[i].name, size)) {
 			return KindToStr(class_table[i].kind);
 		}
 	}
+	printf("Error, unknown kind for %s\n", name);
 	return "unknown";
 }
 
@@ -292,17 +318,19 @@ void GetTypeOf(char *buffer, char *name){
 }
 
 int GetIndexOf(char *name){
+	size_t size = StringSize(name);
 	for(int i = 0; i < var_counter + argument_counter; i++){
-		if (strcmp(name, routine_table[i].name)) {
+		if (CompareStr(name, routine_table[i].name, size)) {
 			return routine_table[i].id;
 		}
 	}
 
 	for(int i = 0; i < static_counter + field_counter; i++){
-		if (strcmp(name, class_table[i].name)) {
+		if (CompareStr(name, class_table[i].name, size)) {
 			return class_table[i].id;
 		}
 	}
+	dprintf("Can't find index of %s", name);
 	exit(1);
 }
 
@@ -469,24 +497,7 @@ static void TokenizeBuffer(char *input_buffer, char *tokens_buffer, size_t bytes
             ConcatStr(tag, type); 
             ConcatStr(tag, ">");
             CopyToBuffer(&token_buffer_ptr, tag);
-            switch(token.value[0]){
-                case '<':
-                    CopyToBuffer(&token_buffer_ptr, "&lt;");
-                    break;
-                case '>':
-                    CopyToBuffer(&token_buffer_ptr, "&gt;");
-                    break;
-                case '"':
-                    CopyToBuffer(&token_buffer_ptr,"&quot;");
-                    break;
-                case '&':
-                    CopyToBuffer(&token_buffer_ptr, "&amp;");
-                    break;
-                default:
-                    CopyToBuffer(&token_buffer_ptr, token.value);
-                    break;
-            }
-
+			CopyToBuffer(&token_buffer_ptr, token.value);
             CopyStr(tag, "</");
             ConcatStr(tag, type); 
             ConcatStr(tag, ">\n");
@@ -583,6 +594,8 @@ void CompileExpression();
 void CompileSubroutineCall();
 
 void CompileTerm(){
+	char *token_mark = token_buffer_ptr;
+	char *compile_mark = compile_xml_ptr;
 	Token t;
 	OpenTag("term");
 	EmitXml("\n");
@@ -602,6 +615,14 @@ void CompileTerm(){
 			EmitToken(); // ]
 	} else if(NextTokenValue(token_buffer_ptr, "(") || NextTokenValue(token_buffer_ptr, "."))
 		CompileSubroutineCall();
+	else if(CurrentTokenValue("true")){
+		DiscardToken();
+		WritePushConst("0");
+		Write("not");
+	} else if (CurrentTokenValue("false") || CurrentTokenValue("null")){
+		WritePushConst("0");
+		DiscardToken();
+	} 
 	else {
 		t = EmitToken();
 		if(t.type == INTEGER_CONSTANT)  
@@ -625,17 +646,8 @@ void CompileExpression(){
 	if(IsOp(t.value[0])){
 		DiscardToken(); // Operator
 		CompileExpression();
-		WriteArithmetic(t.value);
+		WriteArithmetic(t.value[0]);
 	}
-	//do{
-	//	second_term = false;
-	//	CompileTerm();
-	//	Token t = GetCurrentToken();
-	//	if(IsOp(t.value[0])) {
-	//		EmitToken();
-	//		second_term = true;
-	//	}
-	//} while(second_term);
 	CloseTag("expression");
 }
 
@@ -666,8 +678,8 @@ void CompileReturn(){
 		CompileExpression();
 	} else {
 		WritePushConst("0");
-		WriteReturn();
 	}
+	WriteReturn();
 	EmitToken(); // ;
 	CloseTag("returnStatement");
 }
@@ -707,20 +719,39 @@ void CompileDo(){
 void CompileWhile(){
 	char *token_mark = token_buffer_ptr;
 	char *compile_mark = compile_xml_ptr;
+	char label_top[20];
+	char label_bottom[20];
+	sprintf(label_top, "WHILE_EXP%i", while_counter);
+	sprintf(label_bottom, "WHILE_END%i", while_counter);
+	while_counter++;
+
+	WriteLabel(label_top);
 	OpenTag("whileStatement");
 	EmitXml("\n");
 	EmitToken(); // while
 	EmitToken(); // (
 	CompileExpression();
+	Write("not");
 	EmitToken(); // )
 	EmitToken(); // {
+	WriteIf(label_bottom);
 	CompileStatements();
 	EmitToken(); // }
+	WriteGoto(label_top);
+	WriteLabel(label_bottom);
     CloseTag("whileStatement");
 }
 void CompileIf(){
 	char *token_mark = token_buffer_ptr;
 	char *compile_mark = compile_xml_ptr;
+	char label_false[20];
+	char label_true[20];
+	char label_end[20];
+	sprintf(label_false, "IF_FALSE%i", if_counter);
+	sprintf(label_true, "IF_TRUE%i", if_counter);
+	sprintf(label_end, "IF_END%i", if_counter);
+	if_counter++;
+
 	OpenTag("ifStatement");
 	EmitXml("\n");
 	EmitToken(); // if
@@ -728,13 +759,20 @@ void CompileIf(){
 	CompileExpression();
 	EmitToken(); // )
 	EmitToken(); // {
+	WriteIf(label_true);
+	WriteGoto(label_false);
+	WriteLabel(label_true);
 	CompileStatements();
+	WriteGoto(label_end);
+	//WriteGoto(label_true);
 	EmitToken(); // }
+	WriteLabel(label_false);
 	if(CurrentTokenValue("else")){
 		EmitToken(); // else
 		EmitToken(); // {
 		CompileStatements();
 		EmitToken(); // }
+		WriteLabel(label_end);
 	}
 	CloseTag("ifStatement");
 }
@@ -778,10 +816,10 @@ void CompileStatements(){
 	EmitXml("\n");
 	while(HasStatement()){
 		if(CurrentTokenValue("let"))    CompileLet();
-		if(CurrentTokenValue("if"))     CompileIf();
-		if(CurrentTokenValue("while"))  CompileWhile();
-		if(CurrentTokenValue("do"))     CompileDo();
-		if(CurrentTokenValue("return")) CompileReturn();
+		else if(CurrentTokenValue("if"))     CompileIf();
+		else if(CurrentTokenValue("while"))  CompileWhile();
+		else if(CurrentTokenValue("do"))     CompileDo();
+		else if(CurrentTokenValue("return")) CompileReturn();
 	}
 	CloseTag("statements");
 }
@@ -790,13 +828,15 @@ bool HasVarDec(){
 	return CurrentTokenValue("var");
 }
 
-void CompileVarDec(){
+int CompileVarDec(){
 	char *token_mark = token_buffer_ptr;
 	char *compile_mark = compile_xml_ptr;
 	char type[20];
 	char name[100];
+	int nVArgs = 0;
 
 	while(HasVarDec()){
+		nVArgs++;
 		OpenTag("varDec");
 		EmitXml("\n");
 		EmitToken(); // var
@@ -805,6 +845,7 @@ void CompileVarDec(){
 		DefineSymbol(name, type, VAR);
 		
 		while(CurrentTokenValue(",")){ 				// rest of inline vars
+			nVArgs++;
 			EmitToken(); // , 
 			strcpy(name, EmitToken().value);
 			DefineSymbol(name, type, VAR);
@@ -813,25 +854,23 @@ void CompileVarDec(){
 		EmitToken(); // ;
 		CloseTag("varDec");
 	}
+	return nVArgs;
 }
 
-int CompileParameterList(){
+void CompileParameterList(){
 	char *token_mark = token_buffer_ptr;
 	char *compile_mark = compile_xml_ptr;
 	char type[20];
 	char name[100];
-	int nArgs = 0;
 	
 	OpenTag("parameterList");
 	EmitXml("\n");
 	if(!CurrentTokenValue(")")){
-		nArgs++;
 		strcpy(type, EmitToken().value);
 		strcpy(name, EmitToken().value);
 		DefineSymbol(name, type, ARG);
 
 		while(!CurrentTokenValue(")")){
-			nArgs++;
 			EmitToken(); // ,
 			strcpy(type, EmitToken().value);
 			strcpy(name, EmitToken().value);
@@ -839,7 +878,6 @@ int CompileParameterList(){
 		}
 	}
 	CloseTag("parameterList");
-	return nArgs;
 }
 
 bool HasSubroutine(){
@@ -848,28 +886,32 @@ bool HasSubroutine(){
 		   CurrentTokenValue("method");
 }
 
-void CompileSubroutine(){
+void CompileSubroutines(){
+
 	char *token_mark = token_buffer_ptr;
 	char *compile_mark = compile_xml_ptr;
 	while( HasSubroutine()){ 
+		while_counter=0;
+		if_counter=0;
 		var_counter = 0;
 		argument_counter = 0;
 		memset(routine_table, 0, sizeof(routine_table));
 		OpenTag("subroutineDec");
 		EmitXml("\n");
-		char *routine_type = EmitToken().value; // constructor/function/method
+		Token t = EmitToken();
+		char *routine_type = t.value; // constructor/function/method
 		EmitToken(); // void/type
 		strcpy(current_routine_name, EmitToken().value); // function name
 		char routine_def[200];
 		sprintf(routine_def, "%s %s.%s", routine_type, current_class_name, current_routine_name);
 		EmitToken(); // (
-		int nArgs = CompileParameterList();
-		WriteFunction(routine_type, nArgs);
+		CompileParameterList();
 		EmitToken(); // )
 		OpenTag("subroutineBody");
 		EmitXml("\n");
 		EmitToken(); // {
-		CompileVarDec();
+		int nVArgs = CompileVarDec();
+		WriteFunction(routine_type, nVArgs);
 		CompileStatements();
 		EmitToken(); // } 
 		CloseTag("subroutineBody");
@@ -929,7 +971,7 @@ void CompileClass(){
 	strcpy(current_class_name, EmitToken().value); // class
 	EmitToken(); // {
 	CompileClassVarDec();
-	CompileSubroutine();
+	CompileSubroutines();
 	EmitToken(); // }
 	CloseTag("class");
 }
@@ -1029,6 +1071,7 @@ int main(int argc, char *argv[]){
 #endif
 
     if(argc < 2){
+		dprintf("not enough arguments.\n");
         exit(1);
     }
 

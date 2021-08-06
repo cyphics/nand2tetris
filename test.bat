@@ -1,6 +1,6 @@
 @echo off
 
-cl -W4 -wd4996 -wd4201 -wd4100 -wd4189 -wd4505 -wd4127 -Zi -nologo main.c /DTESTING
+cl -W4 -wd4996 -wd4201 -wd4100 -wd4189 -wd4505 -wd4127 -Zi -nologo main.c /DVERBOSE
 IF %ERRORLEVEL% GEQ 1 EXIT /B 2
 
 set all_tests=false
@@ -58,8 +58,17 @@ type Seven\Main.vm
 EXIT /B 0
 ) else (
 	main.exe Seven/Main.jack
-	type Seven\Main.jack
-	type Seven\Main.vm
+	REM type Seven\Main.jack
+	REM type Seven\Main.vm
+	call ../../../tools/TextComparer.bat Seven\Main.vm Seven\MainTest.vm 
+	echo ""
+
+	main.exe ConvertToBin/Main.jack
+	REM type ConvertToBin\Main.jack
+	REM type ConvertToBin\Main.vm
+	call ../../../tools/TextComparer.bat ConvertToBin\Main.vm ConvertToBin\MainTest.vm 
+	REM call C:\Users\Thierry\ownCloud\programming\nand2tetris\projects\08\vmtranslator\target\debug\vmtranslator.exe ConvertToBin\MainTest.vm
+	echo ""
 
 )
 
