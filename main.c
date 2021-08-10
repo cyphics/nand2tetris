@@ -1,4 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS
+
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -27,8 +28,13 @@ char *token_buffer_ptr;
 char *compile_xml_ptr;
 char *compile_vm_ptr;
 
+char current_file_path[MAX_PATH];
 char current_class_name[100];
 char current_routine_name[100];
+
+bool parsing_constructor = false;
+bool parsing_method 	 = false;
+
 
 int while_counter = 0;
 int if_counter    = 0;
@@ -51,6 +57,7 @@ void __cdecl dprintf(const char *format, ...){
     *p++ = '\n';
     *p   = '\0';
     OutputDebugString(buf);
+	printf(format, args);
 }
 
 
@@ -175,7 +182,7 @@ char *KindToStr(Kind k){
 			return "static";
 			break;
 		case FIELD:
-			return "";
+			return "this";
 			break;
 		case ARG:
 			return "argument";
@@ -210,26 +217,25 @@ void WritePop(char *segment, int index){
 	compile_vm_ptr += sprintf(compile_vm_ptr, "pop %s %i\n", segment, index);
 }
 
-void WriteArithmetic(char c){
-	if(c == '+')
+void WriteArithmetic(char* c){
+	if(CompareStr(c, "+", StringSize(c)))
 		Write("add");
-	else if(c == '-')
+	else if(CompareStr(c, "-", StringSize(c)))
 		Write("sub");
-	else if(c == '*')
+	else if(CompareStr(c, "*", StringSize(c)))
 		Write("call Math.multiply 2");
-	else if(c == '/')
+	else if(CompareStr(c, "/", StringSize(c)))
 		Write("call Math.divide 2");
-	else if(c == '<')
+	else if(CompareStr(c, "&lt;", StringSize(c)))
 		Write("lt");
-	else if(c == '>')
+	else if(CompareStr(c, "&gt;", StringSize(c)))
 		Write("gt");
-	else if(c == '&')
+	else if(CompareStr(c, "&amp;", StringSize(c)))
 		Write("and");
-	else if(c == '=')
+	else if(CompareStr(c, "=", StringSize(c)))
 		Write("eq");
-	else if(c == '|')
+	else if(CompareStr(c, "|", StringSize(c)))
 		Write("or");
-	
 }
 
 void WriteLabel(char *label){
@@ -240,7 +246,7 @@ void WriteGoto(char *label){
 	compile_vm_ptr += sprintf(compile_vm_ptr, "goto %s\n", label);
 }
 
-void WriteIf(char *label){
+void WriteIfGoto(char *label){
 	compile_vm_ptr += sprintf(compile_vm_ptr, "if-goto %s\n", label);
 }
 
@@ -249,8 +255,8 @@ void WriteCall(char *name, int nArgs){
 	compile_vm_ptr += sprintf(compile_vm_ptr, "call %s %i\n", name, nArgs);
 }
 
-void WriteFunction(char *type, int nLocals){
-	compile_vm_ptr += sprintf(compile_vm_ptr, "%s %s.%s %i\n", type, current_class_name, current_routine_name, nLocals);
+void WriteFunction(int nLocals){
+	compile_vm_ptr += sprintf(compile_vm_ptr, "function %s.%s %i\n", current_class_name, current_routine_name, nLocals);
 }
 
 
@@ -286,33 +292,37 @@ int GetVarCount(Kind kind){
 	exit(1);
 }
 
-char *GetKindOf(char *name){
+void GetKindOf(char *buffer, char *name){
 	size_t size = StringSize(name);
 	for(int i = 0; i < var_counter + argument_counter; i++){
 		if (CompareStr(name, routine_table[i].name, size)) {
-			return KindToStr(routine_table[i].kind);
+			strcpy(buffer, KindToStr(routine_table[i].kind));
+			return;
 		}
 	}
 
 	for(int i = 0; i < static_counter + field_counter; i++){
 		if (CompareStr(name, class_table[i].name, size)) {
-			return KindToStr(class_table[i].kind);
+			strcpy(buffer, KindToStr(class_table[i].kind));
+			return;
 		}
 	}
-	printf("Error, unknown kind for %s\n", name);
-	return "unknown";
+	strcpy(buffer, "unknown");
 }
 
 void GetTypeOf(char *buffer, char *name){
+	size_t size = StringSize(name);
 	for(int i = 0; i < var_counter + argument_counter; i++){
-		if (strcmp(name, routine_table[i].name)) {
+		if (CompareStr(name, routine_table[i].name,size)) {
 			strcpy(buffer, routine_table[i].type);	
+			return;
 		}
 	}
 
 	for(int i = 0; i < static_counter + field_counter; i++){
-		if (strcmp(name, class_table[i].name)) {
-			strcpy(buffer, class_table[i].name);
+		if (CompareStr(name, class_table[i].name, size)) {
+			strcpy(buffer, class_table[i].type);
+			return;
 		}
 	}
 }
@@ -339,7 +349,7 @@ int GetIndexOf(char *name){
 
 const char symbolsList[] = { '{', '}', '(', ')', '[', ']', '.', ',', ';', '+', '-', '*', '/', '&', '|', '<', '>', '=', '~'};
 const char* keywordsList[] = { "class", "constructor", "function", "method", "field", "static", "var", "int", "char", "boolean", "void", "true", "false", "null", "this", "let", "do", "if", "else", "while", "return"};
-const char opList[] = {'+', '-', '*', '/', '&', '|', '<', '>', '='};
+const char* opList[] = {"+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "="};
 const char unaryOpList[] = {'-', '~'};
 
 typedef enum TokenId{
@@ -407,9 +417,9 @@ bool IsSymbol(char c){
     return false;
 }
 
-bool IsOp(char c){
+bool IsOp(char *c){
     for(size_t i = 0; i<ArrayCount(opList); i++){
-        if(c == opList[i]) return true;
+        if(CompareStr(c, opList[i], StringSize(opList[i]))) return true;
     }
     return false;
 }
@@ -467,9 +477,6 @@ void TrimBuffer(char **pos){
         } else if(**pos == ' ') {
             while(**pos == ' ') *pos += 1;
             has_trimed = true;
-	//	} else if (**pos == '\"') {
-	//		while(**pos == '\"') *pos += 1; 
-	//		has_trimed = true;
 		} else if (**pos == '\t') {
 			while(**pos == '\t') *pos += 1; 
 			has_trimed = true;
@@ -497,7 +504,24 @@ static void TokenizeBuffer(char *input_buffer, char *tokens_buffer, size_t bytes
             ConcatStr(tag, type); 
             ConcatStr(tag, ">");
             CopyToBuffer(&token_buffer_ptr, tag);
-			CopyToBuffer(&token_buffer_ptr, token.value);
+            switch(token.value[0]){
+                case '<':
+                    CopyToBuffer(&token_buffer_ptr, "&lt;");
+                    break;
+                case '>':
+                    CopyToBuffer(&token_buffer_ptr, "&gt;");
+                    break;
+                case '"':
+                    CopyToBuffer(&token_buffer_ptr,"&quot;");
+                    break;
+                case '&':
+                    CopyToBuffer(&token_buffer_ptr, "&amp;");
+                    break;
+                default:
+                    CopyToBuffer(&token_buffer_ptr, token.value);
+                    break;
+            }
+			//CopyToBuffer(&token_buffer_ptr, token.value);
             CopyStr(tag, "</");
             ConcatStr(tag, type); 
             ConcatStr(tag, ">\n");
@@ -542,12 +566,6 @@ bool NextTokenValue(char *ptr, const char *value) {
 	do{ ptr++; } while (*ptr != '>');
 	ptr++;
 	return *ptr == *value; // We only compare a single character so we can use this shortcut
-	//while(*copy_ptr != '<') {
-	//	*(token_name_ptr++) = *copy_ptr;
-	//	copy_ptr ++;
-	//}
-	//dprintf("after %s", value);
-	//return CompareStr(token_name, value, StringSize(value));
 }
 
 Token EatToken(){
@@ -595,10 +613,8 @@ void CompileSubroutineCall();
 
 void CompileTerm(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	Token t;
-	OpenTag("term");
-	EmitXml("\n");
 	if(CurrentTokenValue("(")){
 		EmitToken(); // (
 		CompileExpression();
@@ -613,50 +629,60 @@ void CompileTerm(){
 			EmitToken(); // [
 			CompileExpression();
 			EmitToken(); // ]
-	} else if(NextTokenValue(token_buffer_ptr, "(") || NextTokenValue(token_buffer_ptr, "."))
+	} else if(NextTokenValue(token_buffer_ptr, "(") || NextTokenValue(token_buffer_ptr, ".")){
 		CompileSubroutineCall();
-	else if(CurrentTokenValue("true")){
+	} else if(CurrentTokenValue("true")){
 		DiscardToken();
 		WritePushConst("0");
 		Write("not");
 	} else if (CurrentTokenValue("false") || CurrentTokenValue("null")){
 		WritePushConst("0");
 		DiscardToken();
-	} 
-	else {
+	} else if (CurrentTokenValue("this")){
+		WritePush("pointer", 0);
+		DiscardToken();
+	} else {
 		t = EmitToken();
 		if(t.type == INTEGER_CONSTANT)  
 			WritePushConst(t.value);
-		else{
-			WritePush(GetKindOf(t.value), GetIndexOf(t.value));	
+		else if (t.type == STRING_CONSTANT){
+			size_t length = StringSize(t.value);
+			char length_str[20];
+			sprintf(length_str, "%zu", length);
+			WritePushConst(length_str);
+			Write("call String.new 1");	
+			for(int i = 0; i<length; i++){
+				char int_str[3];
+					sprintf(int_str, "%i", t.value[i]);
+					WritePushConst(int_str);
+					Write("call String.appendChar 2");
+			}
+		} else{
+			char kind[100];
+			GetKindOf(kind, t.value);
+			WritePush(kind, GetIndexOf(t.value));	
 		}
 
 	}
-	CloseTag("term");
-
 }
 
 void CompileExpression(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
-	OpenTag("expression");
-	EmitXml("\n");
+	char *compile_mark = compile_vm_ptr;
 	CompileTerm();
 	Token t = GetCurrentToken();
-	if(IsOp(t.value[0])){
+	if(IsOp(t.value)){
 		DiscardToken(); // Operator
 		CompileExpression();
-		WriteArithmetic(t.value[0]);
+		WriteArithmetic(t.value);
 	}
-	CloseTag("expression");
 }
 
 int CompileExpressionList(){
-	int arg_counter = 0;
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
-	OpenTag("expressionList");
-	EmitXml("\n");
+	char *compile_mark = compile_vm_ptr;
+	int arg_counter = 0;
+
 	while(!CurrentTokenValue(")")){
 		arg_counter++;
 		CompileExpression();
@@ -664,13 +690,12 @@ int CompileExpressionList(){
 			EmitToken(); // ,
 		}
 	}
-	CloseTag("expressionList");
 	return arg_counter;
 }
 
 void CompileReturn(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	OpenTag("returnStatement");
 	EmitXml("\n");
 	EmitToken(); // return
@@ -686,27 +711,46 @@ void CompileReturn(){
 
 void CompileSubroutineCall(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	int nArgs = 0;
+	int obj = 0;
 	char subroutine_name[100];
-	strcpy(subroutine_name, EmitToken().value); // identifier 
-	if(CurrentTokenValue("(")){
+
+	Token token = EmitToken();
+
+	if(CurrentTokenValue("(")){ // always a method call from within object
+		WritePush("pointer", 0);
+		sprintf(subroutine_name, "%s.", current_class_name);
+		strcat(subroutine_name, token.value);
 		EmitToken(); // (
-		nArgs = CompileExpressionList();
+		nArgs = CompileExpressionList() + 1; // + 1 because must add this as first argument
 		EmitToken(); // )
 	} else{
 		EmitToken(); // .
+		// If token value is in table (i.e. its kind is != "unknown"), it means it's an object, so it must be passed as first parameter
+		char kind[100];
+		GetKindOf(kind, token.value);
+		if(!CompareStr(kind, "unknown", StringSize("unknown"))){
+			char type[100];
+			GetTypeOf(type, token.value);
+			int id = GetIndexOf(token.value);
+			strcpy(subroutine_name, type); 
+			obj = 1;
+			WritePush(kind, id);
+		} else{
+			strcpy(subroutine_name, token.value);
+		}
 		strcat(subroutine_name, ".");
-		strcat(subroutine_name, EmitToken().value); // subroutine name
+		strcat(subroutine_name, EmitToken().value);
 		EmitToken(); // (
 		nArgs = CompileExpressionList();
 		EmitToken(); // )
 	}
-	WriteCall(subroutine_name, nArgs);
+	WriteCall(subroutine_name, nArgs + obj);
 }
 void CompileDo(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	OpenTag("doStatement");
 	EmitXml("\n");
 	EmitToken(); // do 
@@ -718,7 +762,7 @@ void CompileDo(){
 
 void CompileWhile(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	char label_top[20];
 	char label_bottom[20];
 	sprintf(label_top, "WHILE_EXP%i", while_counter);
@@ -734,7 +778,7 @@ void CompileWhile(){
 	Write("not");
 	EmitToken(); // )
 	EmitToken(); // {
-	WriteIf(label_bottom);
+	WriteIfGoto(label_bottom);
 	CompileStatements();
 	EmitToken(); // }
 	WriteGoto(label_top);
@@ -743,7 +787,7 @@ void CompileWhile(){
 }
 void CompileIf(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	char label_false[20];
 	char label_true[20];
 	char label_end[20];
@@ -751,52 +795,50 @@ void CompileIf(){
 	sprintf(label_true, "IF_TRUE%i", if_counter);
 	sprintf(label_end, "IF_END%i", if_counter);
 	if_counter++;
+	bool has_else = false;
 
-	OpenTag("ifStatement");
-	EmitXml("\n");
 	EmitToken(); // if
 	EmitToken(); // (
 	CompileExpression();
 	EmitToken(); // )
 	EmitToken(); // {
-	WriteIf(label_true);
+	WriteIfGoto(label_true);
 	WriteGoto(label_false);
 	WriteLabel(label_true);
 	CompileStatements();
-	WriteGoto(label_end);
-	//WriteGoto(label_true);
+	if(NextTokenValue(token_buffer_ptr, "else")){
+		has_else = true;
+		WriteGoto(label_end);
+	}
 	EmitToken(); // }
 	WriteLabel(label_false);
-	if(CurrentTokenValue("else")){
+	if(has_else){
 		EmitToken(); // else
 		EmitToken(); // {
 		CompileStatements();
 		EmitToken(); // }
 		WriteLabel(label_end);
 	}
-	CloseTag("ifStatement");
 }
 
 void CompileLet(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
-	OpenTag("letStatement");
-	EmitXml("\n");
+	char *compile_mark = compile_vm_ptr;
 	char name[100];
+	char kind[100];
+
 	EmitToken(); 			// let
 	strcpy(name, EmitToken().value);
+	GetKindOf(kind, name);
 	if(CurrentTokenValue("[")){
-	GetKindOf(name);
 		EmitToken(); 		// [	
 		CompileExpression();
 		EmitToken(); 		// ]	
 	}
 	EmitToken(); 			// =
 	CompileExpression();
-	GetKindOf(name);
-	WritePop(GetKindOf(name), GetIndexOf(name));
+	WritePop(kind, GetIndexOf(name));
 	EmitToken(); 			// ;
-	CloseTag("letStatement");
 }
 
 
@@ -811,7 +853,7 @@ bool HasStatement(){
 
 void CompileStatements(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	OpenTag("statements");
 	EmitXml("\n");
 	while(HasStatement()){
@@ -830,7 +872,7 @@ bool HasVarDec(){
 
 int CompileVarDec(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	char type[20];
 	char name[100];
 	int nVArgs = 0;
@@ -859,7 +901,7 @@ int CompileVarDec(){
 
 void CompileParameterList(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	char type[20];
 	char name[100];
 	
@@ -889,46 +931,61 @@ bool HasSubroutine(){
 void CompileSubroutines(){
 
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
+
 	while( HasSubroutine()){ 
 		while_counter=0;
 		if_counter=0;
 		var_counter = 0;
 		argument_counter = 0;
 		memset(routine_table, 0, sizeof(routine_table));
-		OpenTag("subroutineDec");
-		EmitXml("\n");
+
 		Token t = EmitToken();
-		char *routine_type = t.value; // constructor/function/method
+
+		if(CompareStr(t.value, "constructor", StringSize("constructor")))
+			parsing_constructor = true;
+		else if(CompareStr(t.value, "method", StringSize("method"))) 
+			parsing_method = true;
+
+
 		EmitToken(); // void/type
 		strcpy(current_routine_name, EmitToken().value); // function name
-		char routine_def[200];
-		sprintf(routine_def, "%s %s.%s", routine_type, current_class_name, current_routine_name);
 		EmitToken(); // (
 		CompileParameterList();
 		EmitToken(); // )
-		OpenTag("subroutineBody");
-		EmitXml("\n");
 		EmitToken(); // {
 		int nVArgs = CompileVarDec();
-		WriteFunction(routine_type, nVArgs);
+		WriteFunction(nVArgs);
+
+		if(parsing_constructor){
+			char length[3];
+			sprintf(length, "%i", static_counter + field_counter);
+			WritePushConst(length);
+			Write("call Memory.alloc 1");
+			WritePop("pointer", 0);
+		}
+		else if(parsing_method){
+			WritePush("argument", 0);
+			WritePop("pointer", 0);
+			}
 		CompileStatements();
+
+		parsing_constructor = false;
+		parsing_method      = false;
 		EmitToken(); // } 
-		CloseTag("subroutineBody");
-		CloseTag("subroutineDec");
 	}
 }
 
 bool HasClassVarDec(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	return CurrentTokenValue("static") ||
 		   CurrentTokenValue("field");
 }
 
 void CompileClassVarDec(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	memset(class_table, 0, sizeof(class_table));
 	static_counter = 0;
 	field_counter  = 0;
@@ -963,17 +1020,14 @@ void CompileClassVarDec(){
 
 void CompileClass(){
 	char *token_mark = token_buffer_ptr;
-	char *compile_mark = compile_xml_ptr;
+	char *compile_mark = compile_vm_ptr;
 	DiscardToken(); // remove <tokens>
-	OpenTag("class");
-	EmitXml("\n");
 	EmitToken(); // className
 	strcpy(current_class_name, EmitToken().value); // class
 	EmitToken(); // {
 	CompileClassVarDec();
 	CompileSubroutines();
 	EmitToken(); // }
-	CloseTag("class");
 }
 
 void SaveToFile(char *buffer, char *filename){
@@ -994,7 +1048,7 @@ void CompileFile(FILE *file_handle, char *filename){
     printf("Processing file %s\n", filename);
 #endif
 	long length;
-
+	strcpy(current_file_path, filename);
     char file_buffer[FILE_BUFFER_SIZE]     = {0};
     char tokens_buffer[TOKENS_BUFFER_SIZE] = {0};
     char output_name[MAX_PATH]             = {0};
@@ -1064,22 +1118,24 @@ bool EndsWith(const char *str, const char *suffix)
 
 int main(int argc, char *argv[]){
 
-#ifdef TESTING 
-	printf("Running test build.\n");
-#else
-	printf("Running normal build\n");
-#endif
 
     if(argc < 2){
 		dprintf("not enough arguments.\n");
         exit(1);
     }
 
+
     char *path = argv[1];
 	char current_dir[MAX_PATH];
 	FILE *file;
 	getcwd(current_dir, MAX_PATH);
 		
+#ifdef TESTING 
+	printf("Parsing path '%s' (test build)\n", path);
+#else
+	printf("Parsing path '%s' (normal build)\n", path);
+#endif
+
 	if(IsFile(path)){
 		fopen_s(&file, path, "r");	
 		if(file != NULL){

@@ -1,6 +1,7 @@
 @echo off
+cls
 
-cl -W4 -wd4996 -wd4201 -wd4100 -wd4189 -wd4505 -wd4127 -Zi -nologo main.c /DVERBOSE
+cl -W4 -wd4996 -wd4201 -wd4100 -wd4189 -wd4505 -wd4127 -Zi -nologo main.c 
 IF %ERRORLEVEL% GEQ 1 EXIT /B 2
 
 set all_tests=false
@@ -24,7 +25,7 @@ call ../../../tools/TextComparer.bat test/SquareT.xml test/Square_tokens.xml
 echo "Testing SquareGame.jack tokens..."
 call ../../../tools/TextComparer.bat test/SquareGameT.xml test/SquareGame_tokens.xml
 echo "Tokenizer tested!"
-echo "" 
+echo. 
 
 
 main.exe test/expressionLess
@@ -32,12 +33,11 @@ echo "Testing simple compiler..."
 echo "Testing expressionLess version of Main.jack..."
 call ../../../tools/TextComparer.bat test/expressionLess/Main.xml test/expressionLess/Main_compile.xml
 echo "Testing expressionLess version of Square.jack..."
-REM type "test\expressionLess\Square_compile.xml"
 call ../../../tools/TextComparer.bat test/expressionLess/Square.xml test/expressionLess/Square_compile.xml
 echo "Testing expressionLess version of SquareGame.jack..."
 call ../../../tools/TextComparer.bat test/expressionLess/SquareGame.xml test/expressionLess/SquareGame_compile.xml
 echo "Simple compiler tested!"
-echo ""
+echo.
 
 echo "Testing final compiler"
 echo "Testing Main.jack..."
@@ -46,30 +46,39 @@ echo "Testing Square.jack..."
 call ../../../tools/TextComparer.bat test/Square.xml test/Square_compile.xml
 echo "Testing SquareGamejack..."
 call ../../../tools/TextComparer.bat test/SquareGame.xml test/SquareGame_compile.xml
-echo ""
+echo.
 
 echo "Testing VM generation..."
-REM main.exe test/bank.jack
-REM type test\bank.jack
-REM type test\bank.vm
 main.exe Seven/Main.jack
 type Seven\Main.vm
 
 EXIT /B 0
 ) else (
+	if exist Square\Square.vm( del Square\Square.vm)
 	main.exe Seven/Main.jack
-	REM type Seven\Main.jack
-	REM type Seven\Main.vm
+	echo "Testing Seven/Main.jack..."
 	call ../../../tools/TextComparer.bat Seven\Main.vm Seven\MainTest.vm 
-	echo ""
+	echo.
 
 	main.exe ConvertToBin/Main.jack
-	REM type ConvertToBin\Main.jack
-	REM type ConvertToBin\Main.vm
+	echo "Testing ConvertToBin/Main.jack..."
 	call ../../../tools/TextComparer.bat ConvertToBin\Main.vm ConvertToBin\MainTest.vm 
-	REM call C:\Users\Thierry\ownCloud\programming\nand2tetris\projects\08\vmtranslator\target\debug\vmtranslator.exe ConvertToBin\MainTest.vm
+	echo.
+
+	main.exe Square
+	echo "Testing Square/Main.jack..."
+	call ../../../tools/TextComparer.bat Square\Main.vm Square\MainTest.vm 
+	echo.
+	echo "Testing Square/Square.jack..."
+	call ../../../tools/TextComparer.bat Square\Square.vm Square\SquareTest.vm 
+	echo.
+	echo "Testing Square/SquareGame.jack..."
+	call ../../../tools/TextComparer.bat Square\SquareGame.vm Square\SquareGameTest.vm 
+	echo.
+
+EXIT /B 0
+	main.exe Average 
+	call ../../../tools/TextComparer.bat Average\Main.vm Average\MainTest.vm 
+	type Average\Main.jack
 	echo ""
-
 )
-
-
