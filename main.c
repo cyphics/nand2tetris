@@ -18,7 +18,7 @@
 
 #define ArrayCount(array)(sizeof(array) / sizeof(array[0]))
 
-#define FILE_BUFFER_SIZE  5000
+#define FILE_BUFFER_SIZE  50000
 #define TOKENS_BUFFER_SIZE 200000
 #define OUTPUT_BUFFER_SIZE 1024 * 1024
 // #define MAX_PATH 100000
@@ -128,11 +128,12 @@ typedef enum Kind{
 }Kind;
 
 typedef struct Symbol{
-	char name[100];
-	char type[20];
+	char name[100]; 
+	char type[20]; // int, MyClass, ...
 	int id;
-	Kind kind;
+	Kind kind;     // field, static, argument, var
 }Symbol;
+
 
 typedef struct VMVar{
 	char *type;
@@ -624,11 +625,6 @@ void CompileTerm(){
 		CompileTerm(); 
 		if(t.value[0] == '-') Write("neg");
 		else Write("not");
-	} else if (NextTokenValue(token_buffer_ptr, "[")){
-			EmitToken(); // array name
-			EmitToken(); // [
-			CompileExpression();
-			EmitToken(); // ]
 	} else if(NextTokenValue(token_buffer_ptr, "(") || NextTokenValue(token_buffer_ptr, ".")){
 		CompileSubroutineCall();
 	} else if(CurrentTokenValue("true")){
@@ -653,16 +649,26 @@ void CompileTerm(){
 			Write("call String.new 1");	
 			for(int i = 0; i<length; i++){
 				char int_str[3];
-					sprintf(int_str, "%i", t.value[i]);
-					WritePushConst(int_str);
-					Write("call String.appendChar 2");
+				sprintf(int_str, "%i", t.value[i]);
+				WritePushConst(int_str);
+				Write("call String.appendChar 2");
 			}
 		} else{
 			char kind[100];
 			GetKindOf(kind, t.value);
-			WritePush(kind, GetIndexOf(t.value));	
-		}
+			if (CurrentTokenValue("[")){
+				DiscardToken(); // [	
+				CompileExpression();
+				WritePush(kind, GetIndexOf(t.value));	
+				DiscardToken(); // ]	
+				Write("add");
+				WritePop("pointer", 1);
+				WritePush("that", 0);
+			}else{
+				WritePush(kind, GetIndexOf(t.value));	
+			}
 
+		}
 	}
 }
 
@@ -833,12 +839,23 @@ void CompileLet(){
 	if(CurrentTokenValue("[")){
 		EmitToken(); 		// [	
 		CompileExpression();
+		WritePush(kind, GetIndexOf(name)); 
+		Write("add");
 		EmitToken(); 		// ]	
+		EmitToken(); 			// =
+		CompileExpression();
+		WritePop("temp", 0);
+		WritePop("pointer", 1);
+		WritePush("temp", 0);
+		WritePop("that", 0);
+		//WritePop(kind, GetIndexOf(name));
+		EmitToken(); 			// ;
+	} else {
+		EmitToken(); 			// =
+		CompileExpression();
+		WritePop(kind, GetIndexOf(name));
+		EmitToken(); 			// ;
 	}
-	EmitToken(); 			// =
-	CompileExpression();
-	WritePop(kind, GetIndexOf(name));
-	EmitToken(); 			// ;
 }
 
 
@@ -944,8 +961,10 @@ void CompileSubroutines(){
 
 		if(CompareStr(t.value, "constructor", StringSize("constructor")))
 			parsing_constructor = true;
-		else if(CompareStr(t.value, "method", StringSize("method"))) 
+		else if(CompareStr(t.value, "method", StringSize("method"))) {
 			parsing_method = true;
+			argument_counter = 1; // the first argument is always 'this'
+		}
 
 
 		EmitToken(); // void/type
