@@ -92,6 +92,7 @@ void CopyToBuffer(char **buffer, const char *content){
 size_t StringSize(const char *str){
     size_t counter = 0;
     while(*str++ != '\0') counter++;
+	counter++; // count \0
     return counter;
 }
 
@@ -367,10 +368,8 @@ char *  TokensCharList[6] = {"none", "symbol", "keyword", "integerConstant", "st
 
 TokenId GetTokenId(char *token_char){
 	for (int i = 0; i < ArrayCount(TokensIdList); i++) {
-		if(CompareStr(token_char + 1, TokensCharList[i], StringSize(TokensCharList[i]))) {
-			token_char += StringSize(TokensCharList[i]) + 2;
+		if(CompareStr(token_char + 1, TokensCharList[i], StringSize(TokensCharList[i]) - 1)) 
 			return TokensIdList[i];
-		}
 	}
 	return NONE;
 }
@@ -642,7 +641,7 @@ void CompileTerm(){
 		if(t.type == INTEGER_CONSTANT)  
 			WritePushConst(t.value);
 		else if (t.type == STRING_CONSTANT){
-			size_t length = StringSize(t.value);
+			size_t length = StringSize(t.value) - 1;
 			char length_str[20];
 			sprintf(length_str, "%zu", length);
 			WritePushConst(length_str);
@@ -978,7 +977,7 @@ void CompileSubroutines(){
 
 		if(parsing_constructor){
 			char length[3];
-			sprintf(length, "%i", static_counter + field_counter);
+			sprintf(length, "%i", field_counter);
 			WritePushConst(length);
 			Write("call Memory.alloc 1");
 			WritePop("pointer", 0);

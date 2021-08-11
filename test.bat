@@ -1,13 +1,12 @@
 @echo off
 cls
 
-
 set all_tests=false
 
 if %all_tests% equ true (
 
 	cl -W4 -wd4996 -wd4201 -wd4100 -wd4189 -wd4505 -wd4127 -Zi -nologo main.c 
-	IF %ERRORLEVEL% GEQ 1 EXIT /B 2
+	IF %ERRORLEVEL% GEQ 1 EXIT /B 0
 
 	REM Clean old test files
 	if exist test\Main_tokens.xml ( del test\Main_tokens.xml )
@@ -18,7 +17,7 @@ if %all_tests% equ true (
 	if exist test\expressionLess\SquareGame_compile.xml (del test\expressionLess\SquareGame_compile.xml )
 
 	main.exe test
-	IF %ERRORLEVEL% GEQ 1 EXIT /B 2
+	IF %ERRORLEVEL% GEQ 1 EXIT /B 0
 	echo "Testing Tokenizer files"
 	echo "Testing Main.jack tokens..."
 	call ../../../tools/TextComparer.bat test/MainT.xml test/Main_tokens.xml
@@ -57,18 +56,18 @@ if %all_tests% equ true (
 	EXIT /B 0
 ) else (
 	REM Clean old test files
-	if exist test\Main_tokens.xml ( del test\Main_tokens.xml )
-	if exist test\Square_tokens.xml ( del test\Square_tokens.xml )
-	if exist test\SquareGame_tokens.xml (del test\SquareGame_tokens.xml )
-	if exist test\expressionLess\Main_compile.xml ( del test\expressionLess\Main_compile.xml )
-	if exist test\expressionLess\Square_compile.xml ( del test\expressionLess\Square_compile.xml )
-	if exist test\expressionLess\SquareGame_compile.xml (del test\expressionLess\SquareGame_compile.xml )
+	REM if exist test\Main_tokens.xml ( del test\Main_tokens.xml )
+	REM if exist test\Square_tokens.xml ( del test\Square_tokens.xml )
+	REM if exist test\SquareGame_tokens.xml (del test\SquareGame_tokens.xml )
+	REM if exist test\expressionLess\Main_compile.xml ( del test\expressionLess\Main_compile.xml )
+	REM if exist test\expressionLess\Square_compile.xml ( del test\expressionLess\Square_compile.xml )
+	REM if exist test\expressionLess\SquareGame_compile.xml (del test\expressionLess\SquareGame_compile.xml )
 
 	cl -W4 -wd4996 -wd4201 -wd4100 -wd4189 -wd4505 -wd4127 -Zi -nologo main.c /DTESTING
-	IF %ERRORLEVEL% GEQ 1 EXIT /B 2
+	IF %ERRORLEVEL% GEQ 1 EXIT /B 0
 
 	main.exe test
-	IF %ERRORLEVEL% GEQ 1 EXIT /B 2
+	IF %ERRORLEVEL% GEQ 1 EXIT /B 0
 	echo "Testing Tokenizer files"
 	echo "Testing Main.jack tokens..."
 	call ../../../tools/TextComparer.bat test/MainT.xml test/Main_tokens.xml
@@ -80,23 +79,23 @@ if %all_tests% equ true (
 	echo. 
 
 	cl -W4 -wd4996 -wd4201 -wd4100 -wd4189 -wd4505 -wd4127 -Zi -nologo main.c
-	IF %ERRORLEVEL% GEQ 1 EXIT /B 2
+	IF %ERRORLEVEL% GEQ 1 EXIT /B 0
 
 	if exist Square\Square.vm( del Square\Square.vm)
 	main.exe Seven/Main.jack
-	IF %ERRORLEVEL% GEQ 1 EXIT /B 2
+	IF %ERRORLEVEL% GEQ 1 EXIT /B 0
 	echo "Testing Seven/Main.jack..."
 	call ../../../tools/TextComparer.bat Seven\Main.vm Seven\MainTest.vm 
 	echo.
 
 	main.exe ConvertToBin/Main.jack
-	IF %ERRORLEVEL% GEQ 1 EXIT /B 2
+	IF %ERRORLEVEL% GEQ 1 EXIT /B 0
 	echo "Testing ConvertToBin/Main.jack..."
 	call ../../../tools/TextComparer.bat ConvertToBin\Main.vm ConvertToBin\MainTest.vm 
 	echo.
 
 	main.exe Square
-	IF %ERRORLEVEL% GEQ 1 EXIT /B 2
+	IF %ERRORLEVEL% GEQ 1 EXIT /B 0
 	echo "Testing Square/Main.jack..."
 	call ../../../tools/TextComparer.bat Square\Main.vm Square\MainTest.vm 
 	echo.
@@ -108,13 +107,13 @@ if %all_tests% equ true (
 	echo.
 
 	main.exe Average 
-	IF %ERRORLEVEL% GEQ 1 EXIT /B 2
+	IF %ERRORLEVEL% GEQ 1 EXIT /B 0
 	echo "Testing Average/Main.jack..."
 	call ../../../tools/TextComparer.bat Average\Main.vm Average\MainTest.vm 
 	echo.
 
 	main.exe Pong
-	IF %ERRORLEVEL% GEQ 1 EXIT /B 2
+	IF %ERRORLEVEL% GEQ 1 EXIT /B 0
 	echo "Testing Pong/Main.jack..."
 	call ../../../tools/TextComparer.bat Pong\Main.vm Pong\MainTest.vm 
 	echo.
@@ -124,7 +123,6 @@ if %all_tests% equ true (
 	call ../../../tools/TextComparer.bat Pong\Ball.vm Pong\BallTest.vm 
 	echo.
 
-	EXIT /B 0
 	echo "Testing Pong/Bat.jack..."
 	call ../../../tools/TextComparer.bat Pong\Bat.vm Pong\BatTest.vm 
 	echo.

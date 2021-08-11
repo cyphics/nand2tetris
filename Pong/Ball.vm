@@ -138,7 +138,7 @@ push local 1
 call Math.multiply 2
 push local 0
 sub
-pop argument 1
+pop this 4
 push constant 2
 push local 1
 call Math.multiply 2
