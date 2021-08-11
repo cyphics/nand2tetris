@@ -130,4 +130,8 @@ if %all_tests% equ true (
 	echo "Testing Pong/PongGame.jack..."
 	call ../../../tools/TextComparer.bat Pong\PongGame.vm Pong\PongGameTest.vm 
 	echo.
+
+	main.exe ComplexArrays
+	echo "Testing ComplexArrays/Main.jack..."
+	call ../../../tools/TextComparer.bat ComplexArrays\Main.vm ComplexArrays\MainTest.vm 
 )
