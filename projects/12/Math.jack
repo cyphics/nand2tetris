@@ -9,13 +9,45 @@
  */
 class Math {
 
+	static Array bits;
+
     /** Initializes the library. */
     function void init() {
+		let bits = Array.new(14);
+		let bits[0]  = 1;
+		let bits[1]  = 2;
+		let bits[2]  = 4;
+		let bits[3]  = 8;
+		let bits[4]  = 16;
+		let bits[5]  = 32;
+		let bits[6]  = 64;
+		let bits[7]  = 128;
+		let bits[8]  = 256;
+		let bits[9]  = 512;
+		let bits[10] = 1024;
+		let bits[11] = 2048;
+		let bits[12] = 4096;
+		let bits[13] = 8192;
+		let bits[14] = 16384;
+		let bits[15] = 16384 + 16384;
+		return;
     }
+
+	function int TwoToThe(int i){
+		return bits[i];
+	}
 
     /** Returns the absolute value of x. */
     function int abs(int x) {
+		if(x < 0){
+			return x * -1;
+		}
+		return x;
     }
+
+	function bool bit(int num, int index){
+		return ~((num & bits[index]) = 0);
+	}
 
     /** Returns the product of x and y. 
      *  When a Jack compiler detects the multiplication operator '*' in the 
@@ -23,6 +55,22 @@ class Math {
      *  the Jack expressions x*y and multiply(x,y) return the same value.
      */
     function int multiply(int x, int y) {
+		var int total;
+		var int shift;
+		var int i, bit;
+
+		let total = 0;
+		let shift = x;
+		let i     = 0;
+
+		while(i < 16){
+			if(Math.bit(y, i)){
+				let total = total + shift;
+			}
+			let shift = shift + shift;
+			let i = i + 1;
+		}
+		return total;
     }
 
     /** Returns the integer part of x/y.
@@ -31,17 +79,59 @@ class Math {
      *  the Jack expressions x/y and divide(x,y) return the same value.
      */
     function int divide(int x, int y) {
+		var int q, result;
+		var boolean isPos;
+
+		let isPos = ((x > 0) & (y > 0));
+		let x = Math.abs(x);
+		let y = Math.abs(y);
+
+		if(x < y){ return 0;}
+
+		let q = Math.divide(x, (y + y));
+		if((x - (2 * q * y)) < y){
+			let result =  q + q;
+		} else {
+			let result = q + q + 1;
+		}
+
+		if(isPos){
+			return result;
+		} else {
+			return -result;
+		}
     }
 
     /** Returns the integer part of the square root of x. */
     function int sqrt(int x) {
+		var int y, i, power;
+		
+		let y = 0;
+		let i = 16;
+
+		while((i > 0) | (i = 0)){
+			let power = ((y + bits[i]) * (y + bits[i]));
+			if(((power < x) | (power = x)) & (power > 0)){
+				let y = y + bits[i];
+			}
+			let i = i - 1;
+		}
+		return y;
     }
 
     /** Returns the greater number. */
     function int max(int a, int b) {
+		if(a > b){
+			return a;
+		}
+		return b;
     }
 
     /** Returns the smaller number. */
     function int min(int a, int b) {
+		if(a < b){
+			return a;
+		}
+		return b;
     }
 }
