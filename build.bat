@@ -1,5 +1,4 @@
 @echo off
 
-copy Screen.jack ScreenTest
-REM copy Math.jack ScreenTest
-call ..\..\tools\JackCompiler.bat ScreenTest
+copy String.jack StringTest
+call ..\..\tools\JackCompiler.bat StringTest
