@@ -1,4 +1,4 @@
 @echo off
 
-copy Math.jack MathTest
-call ..\..\tools\JackCompiler.bat MathTest
+copy Output.jack OutputTest
+call ..\..\tools\JackCompiler.bat OutputTest

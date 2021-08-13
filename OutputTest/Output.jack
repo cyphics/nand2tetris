@@ -25,7 +25,6 @@ class Output {
     function void init() {
 
 		do initMap();
-
 		let cursor_x = 0;
 		let cursor_y = 0;
 
