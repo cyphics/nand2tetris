@@ -1,4 +1,4 @@
 @echo off
 
-copy String.jack StringTest
-call ..\..\tools\JackCompiler.bat StringTest
+copy Sys.jack SysTest
+call ..\..\tools\JackCompiler.bat SysTest
